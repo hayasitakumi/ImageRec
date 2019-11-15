@@ -3,4 +3,6 @@
     <string name="message_send_button">SEND</string>
     <string name="message_hint">MESSAGE</string>
     <string name="add_image_description">Add Image</string>
+    <string name="sign_in_text">Sign In</string>
+    <string name="sign_out">Sign Out</string>
 </resources>
