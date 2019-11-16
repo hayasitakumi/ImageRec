@@ -33,17 +33,15 @@ class MainActivity : AppCompatActivity() {
     private var mUsername: String = ANONYMOUS
     private var mPhotoUrl: String? = null
 
-    //    private var mGoogleApiClient: GoogleApiClient? = null
     private lateinit var googleSignInClient: GoogleSignInClient
 
-    private var mLinearLayoutManager: LinearLayoutManager? = null
+    private var linearLayoutManager: LinearLayoutManager? = null
 
     // Firebase instance variables
-    private val mFirebaseAuth: FirebaseAuth = FirebaseAuth.getInstance()
+    private val firebaseAuth: FirebaseAuth = FirebaseAuth.getInstance()
     private var currentUser: FirebaseUser? = null
-    private var mFirebaseDatabaseReference: DatabaseReference? = null
-    private var mFirebaseAdapter: FirebaseRecyclerAdapter<MyMessage?, MessageViewHolder?>? =
-        null
+    private var firebaseDatabaseReference: DatabaseReference? = null
+    private var firebaseAdapter: FirebaseRecyclerAdapter<MyMessage, MessageViewHolder>? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,14 +54,14 @@ class MainActivity : AppCompatActivity() {
 
         googleSignInClient = GoogleSignIn.getClient(this, gso)
 
-        currentUser = mFirebaseAuth.currentUser
+        currentUser = firebaseAuth.currentUser
 
-        mLinearLayoutManager = LinearLayoutManager(this)
-        mLinearLayoutManager!!.stackFromEnd = true
+        linearLayoutManager = LinearLayoutManager(this)
+        linearLayoutManager!!.stackFromEnd = true
 
-        message_recyclerview.layoutManager = mLinearLayoutManager
+        message_recyclerview.layoutManager = linearLayoutManager
 
-        mFirebaseDatabaseReference = FirebaseDatabase.getInstance().reference
+        firebaseDatabaseReference = FirebaseDatabase.getInstance().reference
         val parser: SnapshotParser<MyMessage> = SnapshotParser { dataSnapshot ->
             val myMessage: MyMessage =
                 dataSnapshot.getValue<MyMessage>(
@@ -74,15 +72,15 @@ class MainActivity : AppCompatActivity() {
         }
 
         val messagesRef =
-            mFirebaseDatabaseReference!!.child(MESSAGES_CHILD)
+            firebaseDatabaseReference!!.child(MESSAGES_CHILD).child(currentUser!!.uid)
 
         val options: FirebaseRecyclerOptions<MyMessage?> =
             FirebaseRecyclerOptions.Builder<MyMessage>()
                 .setQuery(messagesRef, parser)
                 .build()
 
-        mFirebaseAdapter = object :
-            FirebaseRecyclerAdapter<MyMessage?, MessageViewHolder?>(options) {
+        firebaseAdapter = object :
+            FirebaseRecyclerAdapter<MyMessage, MessageViewHolder>(options) {
             override fun onCreateViewHolder(
                 viewGroup: ViewGroup,
                 i: Int
@@ -127,7 +125,7 @@ class MainActivity : AppCompatActivity() {
                         .load(myMessage.imageUrl)
                         .into(viewHolder.messageImageView)
                 }
-                
+
                 if (myMessage.photoUrl == null) {
                     viewHolder.messengerImageView.setImageDrawable(
                         ContextCompat.getDrawable(
@@ -142,21 +140,14 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        mFirebaseAdapter!!.registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver() {
+        firebaseAdapter!!.registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver() {
             override fun onItemRangeInserted(positionStart: Int, itemCount: Int) {
                 super.onItemRangeInserted(positionStart, itemCount)
 
                 message_recyclerview.scrollToPosition(positionStart)
             }
         })
-        message_recyclerview.adapter = mFirebaseAdapter
-
-//        sendButton.setOnClickListener {
-//            val myMessage =
-//                MyMessage("message", mUsername, mPhotoUrl, null)
-//            mFirebaseDatabaseReference!!.child(MESSAGES_CHILD).push().setValue(friendlyMessage)
-//            messageEditText.setText("")
-//        }
+        message_recyclerview.adapter = firebaseAdapter
 
         add_image_fab.setOnClickListener {
             val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
@@ -181,13 +172,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     public override fun onPause() {
-        mFirebaseAdapter!!.stopListening()
         super.onPause()
+        firebaseAdapter!!.stopListening()
     }
 
     public override fun onResume() {
         super.onResume()
-        mFirebaseAdapter!!.startListening()
+        firebaseAdapter!!.startListening()
     }
 
     public override fun onDestroy() {
@@ -203,7 +194,7 @@ class MainActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.sign_out_menu -> {
-                mFirebaseAuth.signOut()
+                firebaseAuth.signOut()
                 googleSignInClient.signOut().addOnCompleteListener(this) {}
                 mUsername = ANONYMOUS
                 startActivity(Intent(this, SignInActivity::class.java))
@@ -213,11 +204,6 @@ class MainActivity : AppCompatActivity() {
             else -> super.onOptionsItemSelected(item)
         }
     }
-
-//    override fun onConnectionFailed(connectionResult: ConnectionResult) {
-//        Log.d(TAG, "onConnectionFailed:$connectionResult")
-//        Toast.makeText(this, "Google Play Services error.", Toast.LENGTH_SHORT).show()
-//    }
 
     override fun onActivityResult(
         requestCode: Int,
@@ -239,7 +225,7 @@ class MainActivity : AppCompatActivity() {
                         mPhotoUrl,
                         LOADING_IMAGE_URL
                     )
-                    mFirebaseDatabaseReference!!.child(MESSAGES_CHILD).push()
+                    firebaseDatabaseReference!!.child(MESSAGES_CHILD).child(currentUser!!.uid).push()
                         .setValue(tempMessage) { databaseError, databaseReference ->
                             if (databaseError == null) {
                                 val key = databaseReference.key
@@ -267,9 +253,7 @@ class MainActivity : AppCompatActivity() {
                     if (taskUri.isSuccessful) {
                         val myMessage =
                             MyMessage("mytext", mPhotoUrl, taskUri.result.toString())
-                        mFirebaseDatabaseReference!!.child(MESSAGES_CHILD)
-                            .child(key!!)
-                            .setValue(myMessage)
+                        firebaseDatabaseReference!!.child(MESSAGES_CHILD).child(currentUser!!.uid).child(key!!).setValue(myMessage)
                     }
                 }
             } else {
@@ -289,8 +273,7 @@ class MainActivity : AppCompatActivity() {
         const val ANONYMOUS = "anonymous"
     }
 
-    class MessageViewHolder(v: View?) :
-        RecyclerView.ViewHolder(v!!) {
+    class MessageViewHolder(v: View?) : RecyclerView.ViewHolder(v!!) {
         val messageTextView: TextView =
             itemView.findViewById<View>(R.id.message_text) as TextView
         val messageImageView: ImageView =
